@@ -1,14 +1,23 @@
 /// <reference path="index.d.ts" />
-import { InputProps, OTPInputViewState } from '@twotalltotems/react-native-otp-input';
+import { InputProps, OTPInputViewState } from 'greact-native-otp-input';
 import React, { Component } from 'react'
-import { View, TextInput, TouchableWithoutFeedback, Keyboard, Platform, I18nManager, EmitterSubscription, } from 'react-native'
+import {
+    View, TextInput, TouchableWithoutFeedback, Keyboard,
+    // Platform,
+    I18nManager, EmitterSubscription,
+} from 'react-native'
 import Clipboard from '@react-native-community/clipboard';
 import styles from './styles'
 import { isAutoFillSupported } from './helpers/device'
 import { codeToArray } from './helpers/codeToArray'
 
-export default class OTPInputView extends Component<InputProps, OTPInputViewState> {
-    static defaultProps: InputProps = {
+interface IInputProps extends InputProps {
+    onErrorFilled?: (error: string) => void;
+    regex: string;
+}
+
+export default class OTPInputView extends Component<IInputProps, OTPInputViewState> {
+    static defaultProps: IInputProps = {
         pinCount: 6,
         autoFocusOnLoad: true,
         secureTextEntry: false,
@@ -18,6 +27,7 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
         clearInputs: false,
         placeholderCharacter: "",
         selectionColor: '#000',
+        regex: `^\\d*$|^$`
     }
 
     private fields: TextInput[] | null[] = []
@@ -26,7 +36,7 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
     private hasCheckedClipBoard?: boolean;
     private clipBoardCode?: string;
 
-    constructor(props: InputProps) {
+    constructor(props: IInputProps) {
         super(props)
         const { code } = props
         this.state = {
@@ -43,7 +53,7 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
     }
 
     componentDidMount() {
-        this.copyCodeFromClipBoardOnAndroid()
+        // this.copyCodeFromClipBoardOnAndroid()
         this.bringUpKeyBoardIfNeeded()
         this.keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', this.handleKeyboardDidHide)
     }
@@ -55,12 +65,12 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
         this.keyboardDidHideListener?.remove()
     }
 
-    private copyCodeFromClipBoardOnAndroid = () => {
-        if (Platform.OS === "android") {
-            this.checkPinCodeFromClipBoard()
-            this.timer = setInterval(this.checkPinCodeFromClipBoard, 400)
-        }
-    }
+    // private copyCodeFromClipBoardOnAndroid = () => {
+    //     if (Platform.OS === "android") {
+    //         this.checkPinCodeFromClipBoard()
+    //         this.timer = setInterval(this.checkPinCodeFromClipBoard, 400)
+    //     }
+    // }
 
     bringUpKeyBoardIfNeeded = () => {
         const { autoFocusOnLoad, pinCount } = this.props
@@ -110,7 +120,13 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
     }
 
     private handleChangeText = (index: number, text: string) => {
-        const { onCodeFilled, pinCount } = this.props
+        const { onCodeFilled, pinCount, onErrorFilled, regex } = this.props
+        const regexp = new RegExp(regex);
+        if (!regexp.test(text)) {
+            this.setState({ digits: this.state.digits.concat("") }, this.notifyCodeChanged);
+            onErrorFilled && onErrorFilled("invalid-code");
+            return
+        }
         const digits = this.getDigits()
         let newdigits = digits.slice()
         const oldTextLength = newdigits[index] ? newdigits[index].length : 0
@@ -188,7 +204,7 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
         const { clearInputs, placeholderCharacter, placeholderTextColor } = this.props
         const { color: defaultPlaceholderTextColor } = { ...defaultTextFieldStyle, ...codeInputFieldStyle }
         return (
-            <View pointerEvents="none" key={index + "view"} testID="inputSlotView">
+            <View pointerEvents={selectedIndex === index ? "auto" : "none"} key={index + "view"} testID="inputSlotView">
                 <TextInput
                     testID="textInput"
                     underlineColorAndroid='rgba(0,0,0,0)'
